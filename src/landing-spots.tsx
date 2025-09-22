@@ -10,30 +10,41 @@ import {
 } from './kanastats';
 import Select from './select';
 
-const fetchSeries = async (setter: (series: Series[]) => void) => {
-  const { series } = await getSeries();
+const fetchSeries = async (
+  setter: (series: Series[]) => void,
+  setDefault: (selected: Series) => void,
+) => {
+  const {
+    series: { ongoing },
+  } = await getSeries();
 
-  setter(series.ongoing);
+  ongoing[0] && setDefault(ongoing[0]);
+  setter(ongoing);
 };
 
 const fetchLeagues = async (
   setter: (leagues: League[]) => void,
+  setDefault: (league: League) => void,
   organization: string,
   season: string,
 ) => {
   const { leagues } = await getSeason(organization, season);
+  const filtered = leagues.filter(({ gameDays }) => gameDays.length > 0);
 
-  setter(leagues.filter(({ gameDays }) => gameDays.length > 0));
+  filtered[0] && setDefault(filtered[0]);
+  setter(filtered);
 };
 
 const fetchGames = async (
   setter: (games: Game[]) => void,
+  setDefault: (map: MapValues) => void,
   organization: string,
   season: string,
   league: string,
 ) => {
   const { games } = await getGames(organization, season, league);
 
+  games[0] && setDefault(MAPS[games[0].mapName as keyof typeof MAPS]);
   setter(games);
 };
 
@@ -70,6 +81,13 @@ const fetchLandingSpots = async (
       return;
     }
 
+    map.querySelectorAll('.mx-auto').forEach((el) => {
+      el.setAttribute(
+        'onerror',
+        'this.src="https://kanastats.com/images/newLogo4.webp"',
+      );
+    });
+
     if (i === 0) {
       const img = map.querySelector('#mapImg');
 
@@ -101,7 +119,7 @@ const LandingSpots = () => {
   const [html, setHtml] = useState<string>();
 
   useEffect(() => {
-    fetchSeries(setAvailableSeries);
+    fetchSeries(setAvailableSeries, setSeries);
   }, []);
 
   useEffect(() => {
@@ -109,7 +127,7 @@ const LandingSpots = () => {
       return;
     }
 
-    fetchLeagues(setLeagues, series.organization, series.season);
+    fetchLeagues(setLeagues, setLeague, series.organization, series.season);
   }, [series]);
 
   useEffect(() => {
@@ -117,7 +135,13 @@ const LandingSpots = () => {
       return;
     }
 
-    fetchGames(setGames, series.organization, series.season, league.key);
+    fetchGames(
+      setGames,
+      setMap,
+      series.organization,
+      series.season,
+      league.key,
+    );
   }, [league]);
 
   useEffect(() => {
@@ -146,7 +170,6 @@ const LandingSpots = () => {
             setSeries(availableSeries?.find(({ name }) => name === value))
           }
           options={availableSeries?.map(({ name }) => name)}
-          defaultOption="Select series"
           id="series"
           value={series?.name}
           label="Series"
@@ -156,7 +179,6 @@ const LandingSpots = () => {
             setLeague(leagues?.find(({ name }) => name === value))
           }
           options={leagues?.map(({ name }) => name)}
-          defaultOption="Select league"
           id="league"
           value={league?.name}
           label="League"
@@ -167,7 +189,6 @@ const LandingSpots = () => {
             ?.map(({ mapName }) => mapName)
             .filter((mapName, index, array) => array.indexOf(mapName) === index)
             .map((mapName) => MAPS[mapName as MapKeys])}
-          defaultOption="Select map"
           id="map"
           value={map}
           label="Map"

@@ -4,19 +4,11 @@ interface Props {
   value: string | undefined;
   onChange: Dispatch<SetStateAction<string | undefined>>;
   options: string[] | undefined;
-  defaultOption: string;
   id: string;
   label: string;
 }
 
-const Select = ({
-  value,
-  onChange,
-  options,
-  defaultOption,
-  id,
-  label,
-}: Props) => {
+const Select = ({ value, onChange, options, id, label }: Props) => {
   if (!options) {
     return null;
   }
@@ -29,7 +21,6 @@ const Select = ({
         onChange={({ target }) => onChange(target.value)}
         value={value}
       >
-        {!value && <option value="">{defaultOption}</option>}
         {options.map((value) => (
           <option key={value} value={value}>
             {value}
