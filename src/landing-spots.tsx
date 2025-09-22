@@ -162,6 +162,10 @@ const LandingSpots = () => {
     );
   }, [map, games]);
 
+  useEffect(() => {
+    setHtml('');
+  }, [series, league, map]);
+
   return (
     <>
       <form>
