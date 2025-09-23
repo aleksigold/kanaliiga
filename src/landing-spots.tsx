@@ -69,13 +69,13 @@ const fetchLandingSpots = async (
     getLandingSpots(organization, season, league, gameId),
   );
   const results = await Promise.all(promises);
-  const workspace = document.createElement('div');
-  workspace.setAttribute('style', 'display: none;');
 
   const html = results.map((html, i) => {
-    workspace.innerHTML = html;
+    const virtual = document.implementation.createHTMLDocument('virtual');
+    virtual.open('replace');
+    virtual.writeln(html);
 
-    const map = workspace.querySelector('#map');
+    const map = virtual.querySelector('#map');
 
     if (!map) {
       return;
@@ -103,8 +103,6 @@ const fetchLandingSpots = async (
       .map((el) => el.outerHTML)
       .join('');
   });
-
-  workspace.remove();
 
   setter(html.join(''));
 };
