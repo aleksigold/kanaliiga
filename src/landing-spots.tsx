@@ -198,7 +198,12 @@ const LandingSpots = () => {
           label="Map"
         />
       </form>
-      {html && <div dangerouslySetInnerHTML={{ __html: html }} />}
+      {html && (
+        <div
+          style={{ position: 'relative' }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )}
     </>
   );
 };

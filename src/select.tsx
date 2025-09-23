@@ -9,25 +9,33 @@ interface Props {
 }
 
 const Select = ({ value, onChange, options, id, label }: Props) => {
-  if (!options) {
-    return null;
-  }
+  const select = (
+    <select
+      id={id}
+      onChange={({ target }) => onChange(target.value)}
+      value={value}
+    >
+      {options?.map((value) => (
+        <option key={value} value={value}>
+          {value}
+        </option>
+      ))}
+    </select>
+  );
 
   return (
-    <>
-      <label htmlFor={id}>{label}</label>
-      <select
-        id={id}
-        onChange={({ target }) => onChange(target.value)}
-        value={value}
-      >
-        {options.map((value) => (
-          <option key={value} value={value}>
-            {value}
-          </option>
-        ))}
-      </select>
-    </>
+    <div
+      style={{
+        marginRight: '.25em',
+        marginBottom: '.25em',
+        display: 'inline-block',
+      }}
+    >
+      <label htmlFor={id} style={{ marginRight: '.25em ' }}>
+        {label}:
+      </label>
+      {options ? select : 'Loading...'}
+    </div>
   );
 };
 
