@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams, type SetURLSearchParams } from 'react-router';
 import {
   getGames,
   getLandingSpots,
@@ -13,12 +14,20 @@ import Select from './select';
 const fetchSeries = async (
   setter: (series: Series[]) => void,
   setDefault: (selected: Series) => void,
+  searchParams: URLSearchParams,
 ) => {
   const {
     series: { ongoing },
   } = await getSeries();
 
-  ongoing[0] && setDefault(ongoing[0]);
+  const matched = ongoing.find((s) => s.season === searchParams.get('season'));
+
+  if (matched) {
+    setDefault(matched);
+  } else if (ongoing[0]) {
+    setDefault(ongoing[0]);
+  }
+
   setter(ongoing);
 };
 
@@ -27,11 +36,19 @@ const fetchLeagues = async (
   setDefault: (league: League) => void,
   organization: string,
   season: string,
+  searchParams: URLSearchParams,
 ) => {
   const { leagues } = await getSeason(organization, season);
   const filtered = leagues.filter(({ gameDays }) => gameDays.length > 0);
 
-  filtered[0] && setDefault(filtered[0]);
+  const matched = filtered.find((l) => l.key === searchParams.get('league'));
+
+  if (matched) {
+    setDefault(matched);
+  } else if (filtered[0]) {
+    setDefault(filtered[0]);
+  }
+
   setter(filtered);
 };
 
@@ -41,10 +58,17 @@ const fetchGames = async (
   organization: string,
   season: string,
   league: string,
+  searchParams: URLSearchParams,
 ) => {
   const { games } = await getGames(organization, season, league);
+  const map = searchParams.get('map');
 
-  games[0] && setDefault(MAPS[games[0].mapName as keyof typeof MAPS]);
+  if (map) {
+    setDefault(map);
+  } else if (games[0]) {
+    setDefault(MAPS[games[0].mapName as keyof typeof MAPS]);
+  }
+
   setter(games);
 };
 
@@ -65,10 +89,22 @@ const fetchLandingSpots = async (
   league: string,
   gameIds: string[],
 ) => {
-  const promises = gameIds.map((gameId) =>
-    getLandingSpots(organization, season, league, gameId),
-  );
-  const results = await Promise.all(promises);
+  const results: string[] = [];
+
+  for (let gameId of gameIds) {
+    try {
+      const result = await getLandingSpots(
+        organization,
+        season,
+        league,
+        gameId,
+      );
+
+      results.push(result);
+    } catch (e) {
+      console.error(`Failed to fetch landing spots for game ${gameId}:`, e);
+    }
+  }
 
   const html = results.map((html, i) => {
     const virtual = document.implementation.createHTMLDocument('virtual');
@@ -107,6 +143,23 @@ const fetchLandingSpots = async (
   setter(html.join(''));
 };
 
+const syncSearchParams = (
+  setSearchParams: SetURLSearchParams,
+  key: string,
+  source: any,
+  selector?: string,
+) => {
+  if (!source) {
+    return;
+  }
+
+  setSearchParams((params) => {
+    params.set(key, selector ? source[selector] : source);
+
+    return params;
+  });
+};
+
 const LandingSpots = () => {
   const [availableSeries, setAvailableSeries] = useState<Series[]>();
   const [series, setSeries] = useState<Series>();
@@ -115,9 +168,22 @@ const LandingSpots = () => {
   const [games, setGames] = useState<Game[]>();
   const [map, setMap] = useState<MapValues>();
   const [html, setHtml] = useState<string>();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
-    fetchSeries(setAvailableSeries, setSeries);
+    syncSearchParams(setSearchParams, 'season', series, 'season');
+  }, [series, setSearchParams]);
+
+  useEffect(() => {
+    syncSearchParams(setSearchParams, 'league', league, 'key');
+  }, [league, setSearchParams]);
+
+  useEffect(() => {
+    syncSearchParams(setSearchParams, 'map', map);
+  }, [map, setSearchParams]);
+
+  useEffect(() => {
+    fetchSeries(setAvailableSeries, setSeries, searchParams);
   }, []);
 
   useEffect(() => {
@@ -125,7 +191,13 @@ const LandingSpots = () => {
       return;
     }
 
-    fetchLeagues(setLeagues, setLeague, series.organization, series.season);
+    fetchLeagues(
+      setLeagues,
+      setLeague,
+      series.organization,
+      series.season,
+      searchParams,
+    );
   }, [series]);
 
   useEffect(() => {
@@ -139,6 +211,7 @@ const LandingSpots = () => {
       series.organization,
       series.season,
       league.key,
+      searchParams,
     );
   }, [league]);
 

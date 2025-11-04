@@ -74,11 +74,25 @@ export const getLandingSpots = async (
   league: string,
   gameId: string,
 ): Promise<string> => {
+  const cached = localStorage.getItem(gameId);
+
+  if (cached) {
+    return cached;
+  }
+
   const response = await fetch(
     createUrl(
       `https://kanastats.com/${organization}/${season}/${league}/games/${gameId}/landing`,
     ),
   );
 
-  return response.text();
+  if (response.status !== 200) {
+    throw new Error('Failed to fetch landing spots');
+  }
+
+  const text = await response.text();
+
+  localStorage.setItem(gameId, text);
+
+  return text;
 };
