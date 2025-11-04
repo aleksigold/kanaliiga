@@ -7,6 +7,7 @@ import {
   getSeries,
   type Game,
   type League,
+  type Registration,
   type Series,
 } from './kanastats';
 import Select from './select';
@@ -34,11 +35,12 @@ const fetchSeries = async (
 const fetchLeagues = async (
   setter: (leagues: League[]) => void,
   setDefault: (league: League) => void,
+  setRegistrations: (registrations: Registration[]) => void,
   organization: string,
   season: string,
   searchParams: URLSearchParams,
 ) => {
-  const { leagues } = await getSeason(organization, season);
+  const { leagues, registrations } = await getSeason(organization, season);
   const filtered = leagues.filter(({ gameDays }) => gameDays.length > 0);
 
   const matched = filtered.find((l) => l.key === searchParams.get('league'));
@@ -49,6 +51,7 @@ const fetchLeagues = async (
     setDefault(filtered[0]);
   }
 
+  setRegistrations(registrations);
   setter(filtered);
 };
 
@@ -88,6 +91,7 @@ const fetchLandingSpots = async (
   season: string,
   league: string,
   gameIds: string[],
+  registrations: Registration[],
 ) => {
   const results: string[] = [];
 
@@ -118,10 +122,13 @@ const fetchLandingSpots = async (
     }
 
     map.querySelectorAll('.mx-auto').forEach((el) => {
-      el.setAttribute(
-        'onerror',
-        'this.src="https://kanastats.com/images/newLogo4.webp"',
-      );
+      const alt = el.getAttribute('alt');
+      const team = registrations.find((r) => r.teamName === alt)?.team;
+      const url = team
+        ? `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${team}.png`
+        : 'https://kanastats.com/images/newLogo4.webp';
+
+      el.setAttribute('onerror', `this.src="${url}"`);
     });
 
     if (i === 0) {
@@ -168,6 +175,7 @@ const LandingSpots = () => {
   const [games, setGames] = useState<Game[]>();
   const [map, setMap] = useState<MapValues>();
   const [html, setHtml] = useState<string>();
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -194,6 +202,7 @@ const LandingSpots = () => {
     fetchLeagues(
       setLeagues,
       setLeague,
+      setRegistrations,
       series.organization,
       series.season,
       searchParams,
@@ -230,8 +239,9 @@ const LandingSpots = () => {
       series.season,
       league.key,
       gameIds,
+      registrations,
     );
-  }, [map, games]);
+  }, [map, games, registrations]);
 
   useEffect(() => {
     setHtml('');

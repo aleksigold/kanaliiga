@@ -16,8 +16,16 @@ export interface League {
   name: string;
 }
 
+export interface Registration {
+  group: string;
+  leagues: string[];
+  team: string;
+  teamName: string;
+}
+
 interface SeasonResponse {
   leagues: League[];
+  registrations: Registration[];
 }
 
 export interface Game {
