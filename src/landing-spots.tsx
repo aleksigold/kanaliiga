@@ -1,59 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, type SetURLSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import {
   getGames,
   getLandingSpots,
-  getSeason,
-  getSeries,
+  getStandings,
   type Game,
   type League,
   type Registration,
   type Series,
 } from './kanastats';
 import Select from './select';
-
-const fetchSeries = async (
-  setter: (series: Series[]) => void,
-  setDefault: (selected: Series) => void,
-  searchParams: URLSearchParams,
-) => {
-  const {
-    series: { ongoing },
-  } = await getSeries();
-
-  const matched = ongoing.find((s) => s.season === searchParams.get('season'));
-
-  if (matched) {
-    setDefault(matched);
-  } else if (ongoing[0]) {
-    setDefault(ongoing[0]);
-  }
-
-  setter(ongoing);
-};
-
-const fetchLeagues = async (
-  setter: (leagues: League[]) => void,
-  setDefault: (league: League) => void,
-  setRegistrations: (registrations: Registration[]) => void,
-  organization: string,
-  season: string,
-  searchParams: URLSearchParams,
-) => {
-  const { leagues, registrations } = await getSeason(organization, season);
-  const filtered = leagues.filter(({ gameDays }) => gameDays.length > 0);
-
-  const matched = filtered.find((l) => l.key === searchParams.get('league'));
-
-  if (matched) {
-    setDefault(matched);
-  } else if (filtered[0]) {
-    setDefault(filtered[0]);
-  }
-
-  setRegistrations(registrations);
-  setter(filtered);
-};
+import { fetchLeagues, fetchSeries, syncSearchParams } from './util';
+import { BlobReader, BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
+import { stringify } from 'csv-stringify/browser/esm/sync';
 
 const fetchGames = async (
   setter: (games: Game[]) => void,
@@ -150,23 +109,6 @@ const fetchLandingSpots = async (
   setter(html.join(''));
 };
 
-const syncSearchParams = (
-  setSearchParams: SetURLSearchParams,
-  key: string,
-  source: any,
-  selector?: string,
-) => {
-  if (!source) {
-    return;
-  }
-
-  setSearchParams((params) => {
-    params.set(key, selector ? source[selector] : source);
-
-    return params;
-  });
-};
-
 const LandingSpots = () => {
   const [availableSeries, setAvailableSeries] = useState<Series[]>();
   const [series, setSeries] = useState<Series>();
@@ -247,9 +189,74 @@ const LandingSpots = () => {
     setHtml('');
   }, [series, league, map]);
 
+  const onClick = async () => {
+    if (!series || !league) {
+      return;
+    }
+
+    const { standings } = await getStandings(
+      series.organization,
+      series.season,
+      league.key,
+    );
+
+    const teamInfo = standings.teams
+      .map(({ name, teamId }) => ({
+        TeamNumber: parseInt(teamId, 10),
+        TeamName: name,
+        TeamShortName: name.slice(0, 3).toUpperCase(),
+        ImageFileName: `${teamId}.png`,
+        TeamColor: 'FFFFFFFF',
+      }))
+      .sort((a, b) => a.TeamNumber - b.TeamNumber);
+
+    const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
+
+    await zipWriter.add('TeamIcon', undefined, { directory: true });
+
+    console.log(teamInfo);
+
+    const iconURLs = Array.from(document.querySelectorAll('.mx-auto'))
+      .filter(
+        (el, i, arr) =>
+          arr.findIndex(
+            (e) => e.getAttribute('alt') === el.getAttribute('alt'),
+          ) === i,
+      )
+      .map((el) => ({
+        team: el.getAttribute('alt'),
+        icon: el.getAttribute('src'),
+      }));
+
+    const icons = teamInfo.map(async ({ TeamName, ImageFileName }) => {
+      const url = iconURLs.find((icon) => icon.team === TeamName)?.icon;
+
+      if (!url) {
+        return;
+      }
+
+      const response = await fetch(url);
+      const blob = await response.blob();
+
+      return zipWriter.add(`TeamIcon/${ImageFileName}`, new BlobReader(blob));
+    });
+
+    const csv = stringify(teamInfo, { header: true });
+
+    await zipWriter.add('TeamInfo.csv', new TextReader(csv));
+    await Promise.all(icons);
+
+    const anchor = document.createElement('a');
+    anchor.download = 'Observer.zip';
+    anchor.href = URL.createObjectURL(await zipWriter.close());
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  };
+
   return (
     <>
-      <form>
+      <form onSubmit={(e) => e.preventDefault()}>
         <Select
           onChange={(value) =>
             setSeries(availableSeries?.find(({ name }) => name === value))
@@ -278,6 +285,9 @@ const LandingSpots = () => {
           value={map}
           label="Map"
         />
+        <button type="button" onClick={onClick}>
+          Generate Observer
+        </button>
       </form>
       {html && (
         <div

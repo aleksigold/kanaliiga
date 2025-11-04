@@ -37,6 +37,19 @@ interface GamesResponse {
   games: Game[];
 }
 
+interface Team {
+  name: string;
+  teamId: string;
+}
+
+interface Standings {
+  teams: Team[];
+}
+
+interface StandingsResponse {
+  standings: Standings;
+}
+
 const createUrl = (url: string) => {
   return `https://corsproxy.io/?url=${url}`;
 };
@@ -103,4 +116,18 @@ export const getLandingSpots = async (
   localStorage.setItem(gameId, text);
 
   return text;
+};
+
+export const getStandings = async (
+  organization: string,
+  season: string,
+  league: string,
+): Promise<StandingsResponse> => {
+  const response = await fetch(
+    createUrl(
+      `https://kanastats.com/${organization}/${season}/${league}/teams/standings?_data=routes%2F%24org.%24serie.%24group.teams`,
+    ),
+  );
+
+  return response.json();
 };
