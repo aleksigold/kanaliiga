@@ -4,7 +4,7 @@
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "v24.8.0"
+      "version": "v25.4.0"
     }
   },
   "customizations": {
