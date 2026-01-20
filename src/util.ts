@@ -11,20 +11,27 @@ export const fetchSeries = async (
   setter: (series: Series[]) => void,
   setDefault: (selected: Series) => void,
   searchParams: URLSearchParams,
+  showPast: boolean,
 ) => {
   const {
-    series: { ongoing },
+    series: { ongoing, past },
   } = await getSeries();
 
-  const matched = ongoing.find((s) => s.season === searchParams.get('season'));
+  const series = [...ongoing];
+
+  if (showPast) {
+    series.push(...past);
+  }
+
+  const matched = series.find((s) => s.season === searchParams.get('season'));
 
   if (matched) {
     setDefault(matched);
-  } else if (ongoing[0]) {
-    setDefault(ongoing[0]);
+  } else if (series[0]) {
+    setDefault(series[0]);
   }
 
-  setter(ongoing);
+  setter(series);
 };
 
 export const fetchLeagues = async (

@@ -51,6 +51,7 @@ const fetchLandingSpots = async (
   league: string,
   gameIds: string[],
   registrations: Registration[],
+  setLoading: (loading: boolean) => void,
 ) => {
   const results: string[] = [];
 
@@ -106,6 +107,7 @@ const fetchLandingSpots = async (
       .join('');
   });
 
+  setLoading(false);
   setter(html.join(''));
 };
 
@@ -119,6 +121,10 @@ const LandingSpots = () => {
   const [html, setHtml] = useState<string>();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [loading, setLoading] = useState(false);
+  const [showPast, setShowPast] = useState(
+    searchParams.get('showPast') === 'true',
+  );
 
   useEffect(() => {
     syncSearchParams(setSearchParams, 'season', series, 'season');
@@ -133,8 +139,12 @@ const LandingSpots = () => {
   }, [map, setSearchParams]);
 
   useEffect(() => {
-    fetchSeries(setAvailableSeries, setSeries, searchParams);
-  }, []);
+    syncSearchParams(setSearchParams, 'showPast', showPast ? 'true' : 'false');
+  }, [showPast, setSearchParams]);
+
+  useEffect(() => {
+    fetchSeries(setAvailableSeries, setSeries, searchParams, showPast);
+  }, [showPast]);
 
   useEffect(() => {
     if (!series) {
@@ -171,6 +181,8 @@ const LandingSpots = () => {
       return;
     }
 
+    setLoading(true);
+
     const gameIds = games
       .filter(({ mapName }) => MAPS[mapName as MapKeys] === map)
       .map(({ gameId }) => gameId);
@@ -182,6 +194,7 @@ const LandingSpots = () => {
       league.key,
       gameIds,
       registrations,
+      setLoading,
     );
   }, [map, games, registrations]);
 
@@ -213,8 +226,6 @@ const LandingSpots = () => {
     const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
 
     await zipWriter.add('TeamIcon', undefined, { directory: true });
-
-    console.log(teamInfo);
 
     const iconURLs = Array.from(document.querySelectorAll('.mx-auto'))
       .filter(
@@ -266,6 +277,23 @@ const LandingSpots = () => {
           value={series?.name}
           label="Series"
         />
+        <div
+          style={{
+            marginRight: '.25em',
+            marginBottom: '.25em',
+            display: 'inline-block',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showPast}
+            onChange={() => setShowPast(!showPast)}
+            name="show-past"
+          />
+          <label htmlFor="show-past" style={{ marginRight: '.25em' }}>
+            Show past
+          </label>
+        </div>
         <Select
           onChange={(value) =>
             setLeague(leagues?.find(({ name }) => name === value))
@@ -289,6 +317,7 @@ const LandingSpots = () => {
           Generate Observer
         </button>
       </form>
+      {loading && <p>Loading...</p>}
       {html && (
         <div
           style={{ position: 'relative' }}

@@ -31,7 +31,7 @@ const Select = ({ value, onChange, options, id, label }: Props) => {
         display: 'inline-block',
       }}
     >
-      <label htmlFor={id} style={{ marginRight: '.25em ' }}>
+      <label htmlFor={id} style={{ marginRight: '.25em', fontWeight: 'bold' }}>
         {label}:
       </label>
       {options ? select : 'Loading...'}

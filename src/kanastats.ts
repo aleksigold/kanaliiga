@@ -7,6 +7,7 @@ export interface Series {
 interface SeriesResponse {
   series: {
     ongoing: Series[];
+    past: Series[];
   };
 }
 
