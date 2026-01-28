@@ -12,15 +12,20 @@ export const fetchSeries = async (
   setDefault: (selected: Series) => void,
   searchParams: URLSearchParams,
   showPast: boolean,
+  showUpcoming: boolean,
 ) => {
   const {
-    series: { ongoing, past },
+    series: { ongoing, past, upcoming },
   } = await getSeries();
 
   const series = [...ongoing];
 
   if (showPast) {
     series.push(...past);
+  }
+
+  if (showUpcoming) {
+    series.push(...upcoming);
   }
 
   const matched = series.find((s) => s.season === searchParams.get('season'));

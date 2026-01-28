@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router';
 import {
   getGames,
   getLandingSpots,
-  getStandings,
   type Game,
   type League,
   type Registration,
@@ -11,8 +10,8 @@ import {
 } from './kanastats';
 import Select from './select';
 import { fetchLeagues, fetchSeries, syncSearchParams } from './util';
-import { BlobReader, BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
-import { stringify } from 'csv-stringify/browser/esm/sync';
+import Observer from './observer';
+import Checkbox from './checkbox';
 
 const fetchGames = async (
   setter: (games: Game[]) => void,
@@ -125,6 +124,9 @@ const LandingSpots = () => {
   const [showPast, setShowPast] = useState(
     searchParams.get('showPast') === 'true',
   );
+  const [showUpcoming, setShowUpcoming] = useState(
+    searchParams.get('showUpcoming') === 'true',
+  );
 
   useEffect(() => {
     syncSearchParams(setSearchParams, 'season', series, 'season');
@@ -143,8 +145,22 @@ const LandingSpots = () => {
   }, [showPast, setSearchParams]);
 
   useEffect(() => {
-    fetchSeries(setAvailableSeries, setSeries, searchParams, showPast);
-  }, [showPast]);
+    syncSearchParams(
+      setSearchParams,
+      'showUpcoming',
+      showUpcoming ? 'true' : 'false',
+    );
+  }, [showUpcoming, setSearchParams]);
+
+  useEffect(() => {
+    fetchSeries(
+      setAvailableSeries,
+      setSeries,
+      searchParams,
+      showPast,
+      showUpcoming,
+    );
+  }, [showPast, showUpcoming]);
 
   useEffect(() => {
     if (!series) {
@@ -202,69 +218,6 @@ const LandingSpots = () => {
     setHtml('');
   }, [series, league, map]);
 
-  const onClick = async () => {
-    if (!series || !league) {
-      return;
-    }
-
-    const { standings } = await getStandings(
-      series.organization,
-      series.season,
-      league.key,
-    );
-
-    const teamInfo = standings.teams
-      .map(({ name, teamId }) => ({
-        TeamNumber: parseInt(teamId, 10),
-        TeamName: name,
-        TeamShortName: name.slice(0, 3).toUpperCase(),
-        ImageFileName: `${teamId}.png`,
-        TeamColor: 'FFFFFFFF',
-      }))
-      .sort((a, b) => a.TeamNumber - b.TeamNumber);
-
-    const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
-
-    await zipWriter.add('TeamIcon', undefined, { directory: true });
-
-    const iconURLs = Array.from(document.querySelectorAll('.mx-auto'))
-      .filter(
-        (el, i, arr) =>
-          arr.findIndex(
-            (e) => e.getAttribute('alt') === el.getAttribute('alt'),
-          ) === i,
-      )
-      .map((el) => ({
-        team: el.getAttribute('alt'),
-        icon: el.getAttribute('src'),
-      }));
-
-    const icons = teamInfo.map(async ({ TeamName, ImageFileName }) => {
-      const url = iconURLs.find((icon) => icon.team === TeamName)?.icon;
-
-      if (!url) {
-        return;
-      }
-
-      const response = await fetch(url);
-      const blob = await response.blob();
-
-      return zipWriter.add(`TeamIcon/${ImageFileName}`, new BlobReader(blob));
-    });
-
-    const csv = stringify(teamInfo, { header: true });
-
-    await zipWriter.add('TeamInfo.csv', new TextReader(csv));
-    await Promise.all(icons);
-
-    const anchor = document.createElement('a');
-    anchor.download = 'Observer.zip';
-    anchor.href = URL.createObjectURL(await zipWriter.close());
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-  };
-
   return (
     <>
       <form onSubmit={(e) => e.preventDefault()}>
@@ -277,23 +230,20 @@ const LandingSpots = () => {
           value={series?.name}
           label="Series"
         />
-        <div
-          style={{
-            marginRight: '.25em',
-            marginBottom: '.25em',
-            display: 'inline-block',
-          }}
+        <Checkbox
+          checked={showPast}
+          onChange={() => setShowPast(!showPast)}
+          name="showPast"
         >
-          <input
-            type="checkbox"
-            checked={showPast}
-            onChange={() => setShowPast(!showPast)}
-            name="show-past"
-          />
-          <label htmlFor="show-past" style={{ marginRight: '.25em' }}>
-            Show past
-          </label>
-        </div>
+          Show past
+        </Checkbox>
+        <Checkbox
+          checked={showUpcoming}
+          onChange={() => setShowUpcoming(!showUpcoming)}
+          name="showUpcoming"
+        >
+          Show upcoming
+        </Checkbox>
         <Select
           onChange={(value) =>
             setLeague(leagues?.find(({ name }) => name === value))
@@ -313,9 +263,7 @@ const LandingSpots = () => {
           value={map}
           label="Map"
         />
-        <button type="button" onClick={onClick}>
-          Generate Observer
-        </button>
+        <Observer series={series} league={league} />
       </form>
       {loading && <p>Loading...</p>}
       {html && (

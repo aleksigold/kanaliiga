@@ -8,6 +8,7 @@ interface SeriesResponse {
   series: {
     ongoing: Series[];
     past: Series[];
+    upcoming: Series[];
   };
 }
 
@@ -22,6 +23,7 @@ export interface Registration {
   leagues: string[];
   team: string;
   teamName: string;
+  logo: string | boolean;
 }
 
 interface SeasonResponse {
