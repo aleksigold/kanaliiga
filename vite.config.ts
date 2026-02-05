@@ -8,6 +8,20 @@ export default defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        app: './src/index.html',
+        serviceworker: './src/serviceworker.ts',
+      },
+      output: {
+        entryFileNames: ({ name }) => {
+          if (name === 'serviceworker') {
+            return '[name].js';
+          }
+          return `assets/[name]-[hash].js`;
+        },
+      },
+    },
   },
   appType: 'spa',
   server: {
