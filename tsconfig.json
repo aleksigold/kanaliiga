@@ -3,7 +3,7 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "target": "esnext",
-    "types": [],
+    "types": ["vite/client"],
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,

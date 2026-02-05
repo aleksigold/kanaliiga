@@ -54,7 +54,7 @@ interface StandingsResponse {
 }
 
 const createUrl = (url: string) => {
-  return `https://corsproxy.io/?url=${url}`;
+  return `${import.meta.env.VITE_PROXY_URL ?? '/proxy'}?url=${url}`;
 };
 
 export const getSeries = async (): Promise<SeriesResponse> => {

@@ -17,7 +17,13 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+        env:
+          VITE_PROXY_URL: https://kanaliiga-proxy.aleksi-918.workers.dev
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist/
       - uses: actions/deploy-pages@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
