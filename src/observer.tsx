@@ -1,6 +1,7 @@
 import { BlobReader, BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
 import { getSeason, getStandings, type League, type Series } from './kanastats';
 import { stringify } from 'csv-stringify/browser/esm/sync';
+import { createUrl } from './util';
 
 interface Props {
   series: Series | undefined;
@@ -65,7 +66,9 @@ const Observer = ({ series, league }: Props) => {
 
         return {
           team: name,
-          icon: `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${uuid}.png`,
+          icon: createUrl(
+            `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${uuid}.png`,
+          ),
         };
       });
     }

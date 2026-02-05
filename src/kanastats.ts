@@ -1,3 +1,5 @@
+import { createUrl } from './util';
+
 export interface Series {
   name: string;
   organization: string;
@@ -52,10 +54,6 @@ interface Standings {
 interface StandingsResponse {
   standings: Standings;
 }
-
-const createUrl = (url: string) => {
-  return `${import.meta.env.VITE_PROXY_URL ?? '/proxy'}?url=${url}`;
-};
 
 export const getSeries = async (): Promise<SeriesResponse> => {
   const response = await fetch(
