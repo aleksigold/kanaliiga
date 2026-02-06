@@ -2,6 +2,7 @@ import { BlobReader, BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
 import { getSeason, getStandings, type League, type Series } from './kanastats';
 import { stringify } from 'csv-stringify/browser/esm/sync';
 import { createUrl } from './util';
+import { HorizontalAlign, Jimp, JimpMime, loadFont, VerticalAlign } from 'jimp';
 
 interface Props {
   series: Series | undefined;
@@ -66,25 +67,58 @@ const Observer = ({ series, league }: Props) => {
 
         return {
           team: name,
-          icon: createUrl(
-            `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${uuid}.png`,
-          ),
+          icon: `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${uuid}.png`,
         };
       });
     }
 
-    const icons = teamInfo.map(async ({ TeamName, ImageFileName }) => {
-      const url = iconURLs.find((icon) => icon.team === TeamName)?.icon;
+    const font = await loadFont('/kanaliiga/open-sans-128-white.fnt');
 
-      if (!url) {
-        return;
-      }
+    const icons = teamInfo.map(
+      async ({ TeamName, ImageFileName, TeamNumber }) => {
+        const url = iconURLs.find((icon) => icon.team === TeamName)?.icon;
 
-      const response = await fetch(url);
-      const blob = await response.blob();
+        if (!url) {
+          return;
+        }
 
-      return zipWriter.add(`TeamIcon/${ImageFileName}`, new BlobReader(blob));
-    });
+        const response = await fetch(createUrl(url));
+        const blob = await response.blob();
+        const image = await Jimp.fromBuffer(
+          await new Response(blob).arrayBuffer(),
+        );
+
+        const background = new Jimp({
+          width: 256,
+          height: 256,
+          color: 0x0000007f,
+        });
+
+        background.print({
+          font,
+          x: 0,
+          y: 0,
+          maxWidth: background.bitmap.width,
+          maxHeight: background.bitmap.height,
+          text: {
+            text: TeamNumber,
+            alignmentX: HorizontalAlign.CENTER,
+            alignmentY: VerticalAlign.MIDDLE,
+          },
+        });
+
+        image.composite(
+          background,
+          image.bitmap.width - background.bitmap.width,
+          image.bitmap.height - background.bitmap.height,
+        );
+
+        return zipWriter.add(
+          `TeamIcon/${ImageFileName}`,
+          new BlobReader(new Blob([await image.getBuffer(JimpMime.png)])),
+        );
+      },
+    );
 
     const csv = stringify(teamInfo, { header: true });
 
