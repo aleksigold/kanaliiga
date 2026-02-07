@@ -88,24 +88,42 @@ const Observer = ({ series, league }: Props) => {
           await new Response(blob).arrayBuffer(),
         );
 
-        const background = new Jimp({
-          width: 256,
-          height: 256,
-          color: 0x0000007f,
+        const pixels = Math.round(image.bitmap.width / Math.sqrt(3));
+        const text = new Jimp({
+          width: pixels,
+          height: pixels,
         });
 
-        background.print({
+        text.print({
           font,
           x: 0,
           y: 0,
-          maxWidth: background.bitmap.width,
-          maxHeight: background.bitmap.height,
+          maxWidth: text.bitmap.width,
+          maxHeight: text.bitmap.height,
           text: {
             text: TeamNumber,
             alignmentX: HorizontalAlign.CENTER,
             alignmentY: VerticalAlign.MIDDLE,
           },
         });
+
+        text.autocrop();
+        text.scaleToFit({
+          w: pixels,
+          h: pixels,
+        });
+
+        const background = new Jimp({
+          width: pixels,
+          height: pixels,
+          color: 0x0000007f,
+        });
+
+        background.composite(
+          text,
+          (pixels - text.bitmap.width) / 2,
+          (pixels - text.bitmap.height) / 2,
+        );
 
         image.composite(
           background,
