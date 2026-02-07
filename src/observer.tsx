@@ -1,13 +1,96 @@
 import { BlobReader, BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
-import { getSeason, getStandings, type League, type Series } from './kanastats';
+import {
+  getSeason,
+  getStandings,
+  type League,
+  type Registration,
+  type Series,
+} from './kanastats';
 import { stringify } from 'csv-stringify/browser/esm/sync';
 import { createUrl } from './util';
-import { HorizontalAlign, Jimp, JimpMime, loadFont, VerticalAlign } from 'jimp';
+import { chunk, countBy, maxBy } from 'lodash-es';
+import {
+  HorizontalAlign,
+  Jimp,
+  JimpMime,
+  loadFont,
+  VerticalAlign,
+  type Bitmap,
+} from 'jimp';
 
 interface Props {
   series: Series | undefined;
   league: League | undefined;
 }
+
+const getMainColor = (bitmap: Bitmap) => {
+  const chunked = chunk(bitmap.data, 4).filter(
+    ([, , , alpha]) => alpha !== undefined && alpha > 0,
+  );
+
+  const count = countBy(chunked);
+  const mostCommon = maxBy(Object.entries(count), ([, value]) => value);
+
+  return (
+    mostCommon?.[0]
+      .split(',')
+      .map((value) =>
+        parseInt(value, 10).toString(16).padStart(2, '0').toUpperCase(),
+      )
+      .join('') ?? 'FFFFFFFF'
+  );
+};
+
+const createLogo = async (
+  icon: Awaited<ReturnType<typeof Jimp.fromBuffer>>,
+  font: Awaited<ReturnType<typeof loadFont>>,
+  teamNumber: number,
+) => {
+  const pixels = Math.round(icon.bitmap.width / Math.sqrt(3));
+  const text = new Jimp({
+    width: pixels,
+    height: pixels,
+  });
+
+  text.print({
+    font,
+    x: 0,
+    y: 0,
+    maxWidth: text.bitmap.width,
+    maxHeight: text.bitmap.height,
+    text: {
+      text: teamNumber,
+      alignmentX: HorizontalAlign.CENTER,
+      alignmentY: VerticalAlign.MIDDLE,
+    },
+  });
+
+  text.autocrop();
+  text.scaleToFit({
+    w: pixels,
+    h: pixels,
+  });
+
+  const background = new Jimp({
+    width: pixels,
+    height: pixels,
+    color: 0x0000007f,
+  });
+
+  background.composite(
+    text,
+    (pixels - text.bitmap.width) / 2,
+    (pixels - text.bitmap.height) / 2,
+  );
+
+  icon.composite(
+    background,
+    icon.bitmap.width - background.bitmap.width,
+    icon.bitmap.height - background.bitmap.height,
+  );
+
+  return icon.getBuffer(JimpMime.png) as unknown as Promise<ArrayBuffer>;
+};
 
 const Observer = ({ series, league }: Props) => {
   const onClick = async () => {
@@ -35,7 +118,7 @@ const Observer = ({ series, league }: Props) => {
 
     await zipWriter.add('TeamIcon', undefined, { directory: true });
 
-    let iconURLs = Array.from(document.querySelectorAll('.mx-auto'))
+    const landingImages = Array.from(document.querySelectorAll('.mx-auto'))
       .filter(
         (el, i, arr) =>
           arr.findIndex(
@@ -47,93 +130,67 @@ const Observer = ({ series, league }: Props) => {
         icon: el.getAttribute('src'),
       }));
 
-    if (iconURLs.length === 0) {
-      const { registrations } = await getSeason(
-        series.organization,
-        series.season,
-      );
+    const { registrations } = landingImages.length
+      ? { registrations: [] as Registration[] }
+      : await getSeason(series.organization, series.season);
 
-      iconURLs = standings.teams.map(({ name }) => {
+    const iconDownloads = standings.teams
+      .map(({ name }) => {
         const uuid = registrations.find(
           ({ teamName, logo }) => teamName === name && logo === true,
         )?.team;
 
-        if (!uuid) {
+        const logo = landingImages.find(({ team }) => team === name)?.icon;
+
+        return {
+          team: name,
+          url:
+            logo ??
+            (uuid
+              ? `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${uuid}.png`
+              : null),
+        };
+      })
+      .map(async ({ team, url }) => {
+        if (!url) {
           return {
-            team: name,
+            team,
             icon: null,
           };
         }
 
-        return {
-          team: name,
-          icon: `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${uuid}.png`,
-        };
-      });
-    }
-
-    const font = await loadFont('/kanaliiga/open-sans-128-white.fnt');
-
-    const icons = teamInfo.map(
-      async ({ TeamName, ImageFileName, TeamNumber }) => {
-        const url = iconURLs.find((icon) => icon.team === TeamName)?.icon;
-
-        if (!url) {
-          return;
-        }
-
         const response = await fetch(createUrl(url));
         const blob = await response.blob();
-        const image = await Jimp.fromBuffer(
+        const icon = await Jimp.fromBuffer(
           await new Response(blob).arrayBuffer(),
         );
 
-        const pixels = Math.round(image.bitmap.width / Math.sqrt(3));
-        const text = new Jimp({
-          width: pixels,
-          height: pixels,
-        });
+        return {
+          team,
+          icon,
+        };
+      });
 
-        text.print({
-          font,
-          x: 0,
-          y: 0,
-          maxWidth: text.bitmap.width,
-          maxHeight: text.bitmap.height,
-          text: {
-            text: TeamNumber,
-            alignmentX: HorizontalAlign.CENTER,
-            alignmentY: VerticalAlign.MIDDLE,
-          },
-        });
+    const font = await loadFont('/kanaliiga/open-sans-128-white.fnt');
+    const icons = await Promise.all(iconDownloads);
 
-        text.autocrop();
-        text.scaleToFit({
-          w: pixels,
-          h: pixels,
-        });
+    const editedIcons = teamInfo.map(
+      async ({ TeamName, TeamNumber, ImageFileName }, i, arr) => {
+        const icon = icons.find(({ team }) => team === TeamName)?.icon;
 
-        const background = new Jimp({
-          width: pixels,
-          height: pixels,
-          color: 0x0000007f,
-        });
+        if (!icon) {
+          return;
+        }
 
-        background.composite(
-          text,
-          (pixels - text.bitmap.width) / 2,
-          (pixels - text.bitmap.height) / 2,
-        );
+        if (arr[i]) {
+          arr[i].TeamColor = getMainColor(icon.bitmap);
+        }
 
-        image.composite(
-          background,
-          image.bitmap.width - background.bitmap.width,
-          image.bitmap.height - background.bitmap.height,
-        );
+        const buffer = await createLogo(icon, font, TeamNumber);
 
         return zipWriter.add(
           `TeamIcon/${ImageFileName}`,
-          new BlobReader(new Blob([await image.getBuffer(JimpMime.png)])),
+          new BlobReader(new Blob([buffer])),
         );
       },
     );
@@ -141,7 +198,7 @@ const Observer = ({ series, league }: Props) => {
     const csv = stringify(teamInfo, { header: true });
 
     await zipWriter.add('TeamInfo.csv', new TextReader(csv));
-    await Promise.all(icons);
+    await Promise.all(editedIcons);
 
     const anchor = document.createElement('a');
     anchor.download = 'Observer.zip';
