@@ -1,4 +1,4 @@
-import { createUrl } from './util';
+import { createUrl } from '../util';
 
 export interface Series {
   name: string;

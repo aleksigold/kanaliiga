@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import LandingSpots from './landing-spots';
+import LandingSpots from './components/landing-spots';
 import { BrowserRouter } from 'react-router';
 
 const app = document.querySelector('#app');

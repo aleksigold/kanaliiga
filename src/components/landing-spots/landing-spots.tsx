@@ -1,47 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
-  getGames,
   getLandingSpots,
   type Game,
   type League,
   type Registration,
   type Series,
-} from './kanastats';
-import Select from './select';
-import { fetchLeagues, fetchSeries, syncSearchParams } from './util';
-import Observer from './observer';
-import Checkbox from './checkbox';
-
-const fetchGames = async (
-  setter: (games: Game[]) => void,
-  setDefault: (map: MapValues) => void,
-  organization: string,
-  season: string,
-  league: string,
-  searchParams: URLSearchParams,
-) => {
-  const { games } = await getGames(organization, season, league);
-  const map = searchParams.get('map');
-
-  if (map) {
-    setDefault(map);
-  } else if (games[0]) {
-    setDefault(MAPS[games[0].mapName as keyof typeof MAPS]);
-  }
-
-  setter(games);
-};
-
-const MAPS = {
-  Baltic_Main: 'Erangel',
-  Desert_Main: 'Miramar',
-  Neon_Main: 'Rondo',
-  Tiger_Main: 'Taego',
-};
-
-type MapKeys = keyof typeof MAPS;
-type MapValues = (typeof MAPS)[MapKeys];
+} from '../../service/kanastats';
+import Select from '../select';
+import {
+  fetchGames,
+  fetchLeagues,
+  fetchSeries,
+  syncSearchParams,
+} from './util';
+import Observer from '../observer';
+import Checkbox from '../checkbox';
+import { MAPS, type MapKeys, type MapValues } from './const';
 
 const fetchLandingSpots = async (
   setter: (html: string) => void,
