@@ -1,8 +1,6 @@
-import type { Dispatch, SetStateAction } from 'react';
-
 interface Props {
   value: string | undefined;
-  onChange: Dispatch<SetStateAction<string | undefined>>;
+  onChange: (value: string | undefined) => void;
   options: string[] | undefined;
   id: string;
   label: string;

@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import LandingSpots from './components/landing-spots';
-import { BrowserRouter } from 'react-router';
+import { BrowserRouter, Route, Routes } from 'react-router';
 
 const app = document.querySelector('#app');
 
@@ -10,6 +10,8 @@ if (!app) {
 
 createRoot(app).render(
   <BrowserRouter basename="/kanaliiga/">
-    <LandingSpots />
+    <Routes>
+      <Route path="/" element={<LandingSpots />} />
+    </Routes>
   </BrowserRouter>,
 );

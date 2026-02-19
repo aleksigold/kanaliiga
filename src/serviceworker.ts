@@ -14,7 +14,11 @@ const registerServiceWorker = () => {
 };
 
 const cache = async ({ request }: FetchEvent) => {
-  if (!request.url.endsWith('/landing') && !request.url.endsWith('.png')) {
+  if (
+    !request.url.endsWith('/landing') &&
+    !request.url.endsWith('.png') &&
+    !request.url.includes('pubg.com')
+  ) {
     return fetch(request);
   }
 

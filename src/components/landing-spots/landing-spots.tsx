@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
-  getLandingSpots,
   type Game,
   type League,
   type Registration,
@@ -10,80 +9,17 @@ import {
 import Select from '../select';
 import {
   fetchGames,
+  fetchLandingSpots,
   fetchLeagues,
   fetchSeries,
+  isMapKey,
+  isMapValue,
   syncSearchParams,
 } from './util';
 import Observer from '../observer';
 import Checkbox from '../checkbox';
 import { MAPS, type MapKeys, type MapValues } from './const';
-
-const fetchLandingSpots = async (
-  setter: (html: string) => void,
-  organization: string,
-  season: string,
-  league: string,
-  gameIds: string[],
-  registrations: Registration[],
-  setLoading: (loading: boolean) => void,
-) => {
-  const results: string[] = [];
-
-  for (let gameId of gameIds) {
-    try {
-      const result = await getLandingSpots(
-        organization,
-        season,
-        league,
-        gameId,
-      );
-
-      results.push(result);
-    } catch (e) {
-      console.error(`Failed to fetch landing spots for game ${gameId}:`, e);
-    }
-  }
-
-  const html = results.map((html, i) => {
-    const virtual = document.implementation.createHTMLDocument('virtual');
-    virtual.open('replace');
-    virtual.writeln(html);
-
-    const map = virtual.querySelector('#map');
-
-    if (!map) {
-      return;
-    }
-
-    map.querySelectorAll('.mx-auto').forEach((el) => {
-      const alt = el.getAttribute('alt');
-      const team = registrations.find((r) => r.teamName === alt)?.team;
-      const url = team
-        ? `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${team}.png`
-        : 'https://kanastats.com/images/newLogo4.webp';
-
-      el.setAttribute('onerror', `this.src="${url}"`);
-    });
-
-    if (i === 0) {
-      const img = map.querySelector('#mapImg');
-
-      img?.setAttribute(
-        'src',
-        `https://kanastats.com${img.getAttribute('src')}`,
-      );
-
-      return map?.outerHTML;
-    }
-
-    return Array.from(map.querySelectorAll('.mx-auto'))
-      .map((el) => el.outerHTML)
-      .join('');
-  });
-
-  setLoading(false);
-  setter(html.join(''));
-};
+import { debounce, mapKeys, throttle } from 'lodash-es';
 
 const LandingSpots = () => {
   const [availableSeries, setAvailableSeries] = useState<Series[]>();
@@ -96,6 +32,7 @@ const LandingSpots = () => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [mapRef, setMapRef] = useState<HTMLDivElement | null>(null);
   const [showPast, setShowPast] = useState(
     searchParams.get('showPast') === 'true',
   );
@@ -168,14 +105,14 @@ const LandingSpots = () => {
   }, [league]);
 
   useEffect(() => {
-    if (!series || !league || !games) {
+    if (!series || !league || !games || !map) {
       return;
     }
 
     setLoading(true);
 
     const gameIds = games
-      .filter(({ mapName }) => MAPS[mapName as MapKeys] === map)
+      .filter(({ mapName }) => isMapKey(mapName) && MAPS[mapName] === map)
       .map(({ gameId }) => gameId);
 
     fetchLandingSpots(
@@ -185,6 +122,7 @@ const LandingSpots = () => {
       league.key,
       gameIds,
       registrations,
+      map,
       setLoading,
     );
   }, [map, games, registrations]);
@@ -192,6 +130,79 @@ const LandingSpots = () => {
   useEffect(() => {
     setHtml('');
   }, [series, league, map]);
+
+  useEffect(() => {
+    if (!mapRef) {
+      return;
+    }
+
+    const logos = mapRef.querySelectorAll('.mx-auto');
+    const handleMouseEnter = throttle(({ target }: Event) => {
+      if (!target || !(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const parent = target.parentElement?.parentElement;
+
+      if (!parent) {
+        return;
+      }
+
+      const gameId = target.getAttribute('gameId');
+      const svg = parent.querySelector(`svg[gameId="${gameId}"]`);
+
+      if (!(svg instanceof SVGElement)) {
+        return;
+      }
+
+      svg.style.display = 'block';
+
+      parent
+        .querySelectorAll(`.mx-auto[gameId]:not([gameId="${gameId}"])`)
+        .forEach((element) => {
+          if (!(element instanceof HTMLElement)) {
+            return;
+          }
+
+          element.style.display = 'none';
+        });
+    }, 100);
+
+    const handleMouseLeave = debounce(({ target }: Event) => {
+      if (!target || !(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const parent = target.parentElement?.parentElement;
+
+      if (!parent) {
+        return;
+      }
+
+      parent.querySelectorAll(`svg`).forEach((svg) => {
+        svg.style.display = 'none';
+      });
+
+      parent.querySelectorAll('.mx-auto').forEach((element) => {
+        if (!(element instanceof HTMLElement)) {
+          return;
+        }
+
+        element.style.display = 'block';
+      });
+    }, 100);
+
+    logos.forEach((logo) => {
+      logo.addEventListener('mouseenter', handleMouseEnter);
+      logo.addEventListener('mouseleave', handleMouseLeave);
+    });
+
+    return () =>
+      logos.forEach((logo) => {
+        logo.removeEventListener('mouseenter', handleMouseEnter);
+        logo.removeEventListener('mouseleave', handleMouseLeave);
+      });
+  }, [mapRef]);
 
   return (
     <>
@@ -229,11 +240,12 @@ const LandingSpots = () => {
           label="League"
         />
         <Select
-          onChange={setMap}
+          onChange={(value) => isMapValue(value) && setMap(value)}
           options={games
             ?.map(({ mapName }) => mapName)
             .filter((mapName, index, array) => array.indexOf(mapName) === index)
-            .map((mapName) => MAPS[mapName as MapKeys])}
+            .filter(isMapKey)
+            .map((mapName) => MAPS[mapName])}
           id="map"
           value={map}
           label="Map"
@@ -245,6 +257,7 @@ const LandingSpots = () => {
         <div
           style={{ position: 'relative' }}
           dangerouslySetInnerHTML={{ __html: html }}
+          ref={setMapRef}
         />
       )}
     </>

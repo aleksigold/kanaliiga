@@ -75,7 +75,7 @@ export const createLogo = async (
     icon.bitmap.height - background.bitmap.height,
   );
 
-  return icon.getBuffer(JimpMime.png) as unknown as Promise<ArrayBuffer>;
+  return icon.getBuffer(JimpMime.png);
 };
 
 export const downloadLogo = async (url: string) => {
