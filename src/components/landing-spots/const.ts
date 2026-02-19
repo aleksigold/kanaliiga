@@ -3,6 +3,7 @@ export const MAPS = {
   Desert_Main: 'Miramar',
   Neon_Main: 'Rondo',
   Tiger_Main: 'Taego',
+  DihorOtok_Main: 'Vikendi',
 };
 
 export type MapKeys = keyof typeof MAPS;
