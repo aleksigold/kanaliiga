@@ -9,7 +9,13 @@ import {
   type Registration,
   type Series,
 } from '../../service/kanastats';
-import { MAP_SIZES, MAPS, type MapKeys, type MapValues } from './const';
+import {
+  IMG_FALLBACK,
+  MAP_SIZES,
+  MAPS,
+  type MapKeys,
+  type MapValues,
+} from './const';
 import {
   getMatch,
   getTelemetry,
@@ -171,9 +177,14 @@ export const fetchLandingSpots = async (
         gameId,
       );
 
-      const flightPath = await getFlightPath(gameId, mapName);
+      try {
+        const flightPath = await getFlightPath(gameId, mapName);
 
-      results.push([gameId, result, flightPath]);
+        results.push([gameId, result, flightPath]);
+      } catch (e) {
+        console.error(`Failed to fetch flight path for game ${gameId}`, e);
+        results.push([gameId, result, []]);
+      }
     } catch (e) {
       console.error(`Failed to fetch landing spots for game ${gameId}:`, e);
     }
@@ -186,7 +197,7 @@ export const fetchLandingSpots = async (
 
     const map = virtual.querySelector('#map');
 
-    if (!map || start === undefined || end === undefined) {
+    if (!map) {
       return;
     }
 
@@ -195,32 +206,38 @@ export const fetchLandingSpots = async (
       const team = registrations.find((r) => r.teamName === alt)?.team;
       const url = team
         ? `https://kanastats.s3-eu-west-1.amazonaws.com/teamlogos/${team}.png`
-        : 'https://kanastats.com/images/newLogo4.webp';
+        : IMG_FALLBACK;
 
-      el.setAttribute('onerror', `this.src="${url}"`);
+      el.setAttribute(
+        'onerror',
+        `if (this.src.includes('amazonaws.com')) { this.src="${IMG_FALLBACK}" } else { this.src="${url}" }`,
+      );
       el.setAttribute('gameId', gameId);
     });
 
     const mapSize = MAP_SIZES[mapName];
-    const svg = virtual.createElement('svg');
-    svg.setAttribute('width', '1024');
-    svg.setAttribute('viewBox', `0 0 ${mapSize} ${mapSize}`);
-    svg.setAttribute(
-      'style',
-      'position: absolute; top: 0; left: 0; display: none;',
-    );
-    svg.setAttribute('gameId', gameId);
 
-    const line = virtual.createElement('line');
-    line.setAttribute('stroke', 'white');
-    line.setAttribute('x1', start.x.toString());
-    line.setAttribute('y1', start.y.toString());
-    line.setAttribute('x2', end.x.toString());
-    line.setAttribute('y2', end.y.toString());
-    line.setAttribute('stroke-width', '2500');
-    svg.appendChild(line);
+    if (start !== undefined && end !== undefined) {
+      const svg = virtual.createElement('svg');
+      svg.setAttribute('width', '1024');
+      svg.setAttribute('viewBox', `0 0 ${mapSize} ${mapSize}`);
+      svg.setAttribute(
+        'style',
+        'position: absolute; top: 0; left: 0; display: none;',
+      );
+      svg.setAttribute('gameId', gameId);
 
-    map.append(svg);
+      const line = virtual.createElement('line');
+      line.setAttribute('stroke', 'white');
+      line.setAttribute('x1', start.x.toString());
+      line.setAttribute('y1', start.y.toString());
+      line.setAttribute('x2', end.x.toString());
+      line.setAttribute('y2', end.y.toString());
+      line.setAttribute('stroke-width', '2500');
+      svg.appendChild(line);
+
+      map.append(svg);
+    }
 
     if (i === 0) {
       const img = map.querySelector('#mapImg');

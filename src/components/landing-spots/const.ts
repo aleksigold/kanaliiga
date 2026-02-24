@@ -16,3 +16,5 @@ export const MAP_SIZES: Record<MapValues, number> = {
   Taego: 816000,
   Vikendi: 816000,
 };
+
+export const IMG_FALLBACK = 'https://kanastats.com/images/newLogo4.webp';
