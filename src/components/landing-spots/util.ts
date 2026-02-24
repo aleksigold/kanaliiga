@@ -1,5 +1,6 @@
 import type { SetURLSearchParams } from 'react-router';
 import {
+  getGame,
   getGames,
   getLandingSpots,
   getSeason,
@@ -8,6 +9,7 @@ import {
   type League,
   type Registration,
   type Series,
+  type Location,
 } from '../../service/kanastats';
 import {
   IMG_FALLBACK,
@@ -16,13 +18,6 @@ import {
   type MapKeys,
   type MapValues,
 } from './const';
-import {
-  getMatch,
-  getTelemetry,
-  type Asset,
-  type LogVehicle,
-  type Location,
-} from '../../service/pubg';
 
 export const fetchSeries = async (
   setter: (series: Series[]) => void,
@@ -117,26 +112,24 @@ export const syncSearchParams = (
 };
 
 const getFlightPath = async (
+  organization: string,
+  season: string,
+  league: string,
   matchId: string,
   mapName: MapValues,
 ): Promise<Location[]> => {
-  const { included } = await getMatch(matchId);
-  const telemetryUrl = included.find((i): i is Asset => i.type === 'asset')
-    ?.attributes.URL;
+  const { aircraftLocations } = await getGame(
+    organization,
+    season,
+    league,
+    matchId,
+  );
+  const locations = Object.entries(aircraftLocations).sort(
+    ([k1], [k2]) => Number.parseInt(k1) - Number.parseInt(k2),
+  );
 
-  if (!telemetryUrl) {
-    throw new Error('Could not find asset URL');
-  }
-
-  const telemetry = await getTelemetry(telemetryUrl);
-  const vehicleLogs = telemetry
-    .filter((log): log is LogVehicle =>
-      ['LogVehicleLeave', 'LogVehicleRide'].includes(log._T),
-    )
-    .filter(({ vehicle }) => vehicle.vehicleId === 'DummyTransportAircraft_C');
-
-  const start = vehicleLogs.find((log) => log._T === 'LogVehicleRide');
-  const end = vehicleLogs.findLast((log) => log._T === 'LogVehicleLeave');
+  const start = locations.at(0)?.[1];
+  const end = locations.at(-1)?.[1];
 
   if (!start || !end) {
     throw new Error('Could not find start or end log');
@@ -145,7 +138,6 @@ const getFlightPath = async (
   const mapSize = MAP_SIZES[mapName];
 
   return [start, end]
-    .map(({ vehicle }) => vehicle.location)
     .map(({ x, y }) => ({
       x: Math.max(0, x),
       y: Math.max(0, y),
@@ -178,7 +170,13 @@ export const fetchLandingSpots = async (
       );
 
       try {
-        const flightPath = await getFlightPath(gameId, mapName);
+        const flightPath = await getFlightPath(
+          organization,
+          season,
+          league,
+          gameId,
+          mapName,
+        );
 
         results.push([gameId, result, flightPath]);
       } catch (e) {
