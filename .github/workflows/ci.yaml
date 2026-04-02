@@ -22,7 +22,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist/
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
